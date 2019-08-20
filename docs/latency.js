@@ -52,9 +52,9 @@ function filterUpdates(commits) {
 
 async function getGitHubPr(commit) {
     await new Promise(resolve => setTimeout(resolve, 100));
-    wptRev = commit.wptrev;
+    let wptRev = commit.wptrev;
     let resp = await fetch(`https://api.github.com/repos/web-platform-tests/wpt/commits/${wptRev}/pulls`,
-                           {headers: {accept: "application/vnd.github.groot-preview+json"}})
+                           {headers: {accept: "application/vnd.github.groot-preview+json"}});
     let pr = await resp.json();
     return pr[0];
 }
@@ -74,10 +74,13 @@ function* enumerate(items) {
 }
 
 async function getSyncPoints() {
+    setStatus("Getting commits");
     let resp = await fetch("https://hg.mozilla.org/mozilla-central/json-log/tip/testing/web-platform/meta/mozilla-sync");
     let commitData = await resp.json();
     commitData = filterUpdates(filterBackouts(commitData.entries));
+    let count = 1;
     for (let commit of commitData) {
+        setStatus(`Getting PR ${count++}/${commitData.length}`);
         commit.pr = await getGitHubPr(commit);
         commit.latency = getLandingLatency(commit);
     }
@@ -85,14 +88,18 @@ async function getSyncPoints() {
     return commitData;
 }
 
+function setStatus(text) {
+    document.getElementById('latency_chart').textContent = `Loading: ${text}…`;
+}
+
 
 async function drawCharts() {
     let data = await getSyncPoints();
     var chartData = new google.visualization.DataTable();
-    chartData.addColumn('number', 'Sync Date');
-    chartData.addColumn('number', 'Latency');
+    chartData.addColumn('datetime', 'Sync Date');
+    chartData.addColumn('number', 'Latency / days');
     for (let commit of data) {
-        chartData.addRow([commit.pushdate[0], commit.latency]);
+        chartData.addRow([new Date(commit.pushdate[0] * 1000), commit.latency / (24 * 3600)]);
     }
     var options = {
         title: 'wpt sync latency'
