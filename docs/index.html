@@ -1,5 +1,9 @@
 <!doctype html>
 <meta charset=utf8>
+<script>
+navigator.serviceWorker.register('serviceworker.js', {scope: './'})
+    .then(registration => console.log(registration));
+</script>
 <title>Are we wpt yet?</title>
 <h1>Are we wpt yet?</h1>
 <a href="https://github.com/web-platform-tests/wpt/pulls?utf8=%E2%9C%93&q=is%3Apr+is%3Aclosed+label%3Amozilla%3Agecko-blocked+">Blocked landed PRs</a>
