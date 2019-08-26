@@ -113,7 +113,7 @@ async function getSyncPoints() {
         commit.pr = await getGitHubPr(commit.wptrev);
         if (commit.pr === null) {
             rateLimited();
-            return;
+            return commitData;
         }
         commit.latency = getLandingLatency(commit);
     }
