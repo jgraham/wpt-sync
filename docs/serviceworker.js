@@ -10,11 +10,12 @@ async function handleFetch(event) {
     if (cache !== null) {
         let response = await cache.match(request);
         if (response && response.status === 200) {
+            response.headers.append("X-ServiceWorker", "true");
             return response;
         }
     }
     let response = await fetch(request);
-    if (cache !== null) {
+    if (cache !== null && response.status === 200) {
         cache.put(request.url, response.clone());
     }
     return response;
