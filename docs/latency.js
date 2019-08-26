@@ -69,6 +69,32 @@ function getLandingLatency(commit) {
     return commit.pushdate[0] - (Date.parse(commit.pr.closed_at) / 1000);
 }
 
+async function getCurrentLanding() {
+    let resp = await fetch("https://bugzilla.mozilla.org/rest/bug?whiteboard=[wptsync%20landing]&status=NEW");
+    let bugs = await resp.json();
+    if (bugs.bugs.length === 0) {
+        return null;
+    }
+    let filtered = [];
+
+    // Also filter on summary
+    bugs.bugs.filter(bug => {
+        let changeset = bug.summary.match(updateRe);
+        if (changeset !== null) {
+            bug.wptrev = changeset[1];
+            return true;
+        }
+        return false;
+    });
+
+    if (bugs.bugs.length > 1) {
+        console.error("Found more than 1 in-progress landing");
+        bugs.bugs.sort((a, b) => new Date(a.creation_time).getTime() >
+                       new Date(b.creation_time).getTime() ? -1 : 1);
+    }
+    return bugs.bugs[0];
+}
+
 function* enumerate(items) {
     let count = 0;
     for (let item of items) {
@@ -98,6 +124,22 @@ function setStatus(text) {
     document.getElementById('latency_chart').textContent = `Loading: ${text}…`;
 }
 
+async function getCurrent() {
+    let currentBug = await getCurrentLanding();
+    if (currentBug === null) {
+        return "No in-progress landing";
+    } else {
+        let pr = await getGitHubPr(currentBug.wptrev);
+        if (pr === null) {
+            rateLimited();
+            return;
+        }
+        let prLandedAt = new Date(pr.closed_at);
+        let latency = new Date() - prLandedAt;
+        return `In-progress landing in bug ${currentBug.id}, current latency
+${(latency / (1000 * 24 * 3600)).toLocaleString(undefined, {maximumFractionDigits: 0})} days`;
+    }
+};
 
 function rateLimited() {
     let errorElem = document.getElementById("error");
@@ -122,5 +164,10 @@ async function drawCharts() {
     chart.draw(chartData, options);
 }
 
-google.charts.load('current', {'packages':['corechart']});
-google.charts.setOnLoadCallback(drawCharts);
+async function render() {
+    google.charts.load('current', {'packages':['corechart']});
+    google.charts.setOnLoadCallback(drawCharts);
+    document.getElementById("current").textContent = await getCurrent();
+}
+
+window.addEventListener("DOMContentLoaded", render);
