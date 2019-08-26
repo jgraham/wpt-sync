@@ -104,7 +104,7 @@ function* enumerate(items) {
 
 async function getSyncPoints() {
     setStatus("Getting commits");
-    let resp = await fetch("https://hg.mozilla.org/mozilla-central/json-log/tip/testing/web-platform/meta/mozilla-sync");
+    let resp = await fetch("https://hg.mozilla.org/integration/mozilla-inbound/json-log/tip/testing/web-platform/meta/mozilla-sync");
     let commitData = await resp.json();
     commitData = filterUpdates(filterBackouts(commitData.entries));
     let count = 1;
