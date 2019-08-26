@@ -50,11 +50,14 @@ function filterUpdates(commits) {
     return filtered;
 }
 
-async function getGitHubPr(commit) {
+async function getGitHubPr(wptRev) {
     await new Promise(resolve => setTimeout(resolve, 100));
-    let wptRev = commit.wptrev;
     let resp = await fetch(`https://api.github.com/repos/web-platform-tests/wpt/commits/${wptRev}/pulls`,
                            {headers: {accept: "application/vnd.github.groot-preview+json"}});
+    if (resp.status == 403) {
+        // Hit the GitHub rate limits
+        return null;
+    }
     let pr = await resp.json();
     return pr[0];
 }
@@ -81,10 +84,13 @@ async function getSyncPoints() {
     let count = 1;
     for (let commit of commitData) {
         setStatus(`Getting PR ${count++}/${commitData.length}`);
-        commit.pr = await getGitHubPr(commit);
+        commit.pr = await getGitHubPr(commit.wptrev);
+        if (commit.pr === null) {
+            rateLimited();
+            return;
+        }
         commit.latency = getLandingLatency(commit);
     }
-    console.log(commitData);
     return commitData;
 }
 
@@ -93,13 +99,21 @@ function setStatus(text) {
 }
 
 
+function rateLimited() {
+    let errorElem = document.getElementById("error");
+    errorElem.textContent = "Hit GitHub rate limits, please wait and reload";
+    errorElem.removeAttribute("hidden");
+}
+
 async function drawCharts() {
     let data = await getSyncPoints();
     var chartData = new google.visualization.DataTable();
     chartData.addColumn('datetime', 'Sync Date');
     chartData.addColumn('number', 'Latency / days');
     for (let commit of data) {
-        chartData.addRow([new Date(commit.pushdate[0] * 1000), commit.latency / (24 * 3600)]);
+        if (commit.latency) {
+            chartData.addRow([new Date(commit.pushdate[0] * 1000), commit.latency / (24 * 3600)]);
+        }
     }
     var options = {
         title: 'wpt sync latency'
